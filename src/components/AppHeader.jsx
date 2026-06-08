@@ -56,7 +56,10 @@ export function AppHeader({ title, showSociety = false }) {
                     s.id === activeSociety ? 'font-semibold text-brand-700' : ''
                   }`}
                 >
-                  {s.name}
+                  <span className="flex flex-col items-start">
+                    <span>{s.name}</span>
+                    {s.level && <span className="text-[11px] font-normal text-slate-400">{s.level}</span>}
+                  </span>
                   {s.id === activeSociety && <span className="h-2 w-2 rounded-full bg-brand-600" />}
                 </button>
               ))}
@@ -66,4 +69,4 @@ export function AppHeader({ title, showSociety = false }) {
       )}
     </header>
   )
-}
+                  }
