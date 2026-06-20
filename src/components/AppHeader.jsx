@@ -69,4 +69,4 @@ export function AppHeader({ title, showSociety = false }) {
       )}
     </header>
   )
-}
+                  }
