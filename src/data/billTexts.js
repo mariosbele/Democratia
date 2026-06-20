@@ -99,7 +99,7 @@ export const BILL_TEXTS = {
   },
 
   'v-tax-2024': {
-    officialUrl: 'https://www.hellenicparliament.gr/Nomothetiko-Ergo/',
+    officialUrl: 'https://www.hellenicparliament.gr/Nomothetiko-Ergo/Katatethenta-Nomosxedia',
     fullText: `ΣΧΕΔΙΟ ΝΟΜΟΥ — ΦΟΡΟΛΟΓΙΚΕΣ ΡΥΘΜΙΣΕΙΣ 2024
 
 Άρθρο 1 — Ασφαλιστικές εισφορές
@@ -119,7 +119,7 @@ export const BILL_TEXTS = {
   },
 
   'v-energy': {
-    officialUrl: 'https://www.hellenicparliament.gr/Nomothetiko-Ergo/',
+    officialUrl: 'https://www.hellenicparliament.gr/Nomothetiko-Ergo/Katatethenta-Nomosxedia',
     fullText: `ΕΘΝΙΚΟ ΣΧΕΔΙΟ ΓΙΑ ΤΙΣ ΑΝΑΝΕΩΣΙΜΕΣ ΠΗΓΕΣ ΕΝΕΡΓΕΙΑΣ
 
 Άρθρο 1 — Στόχος
@@ -136,7 +136,7 @@ export const BILL_TEXTS = {
   },
 
   'v-ai-act': {
-    officialUrl: 'https://eur-lex.europa.eu/',
+    officialUrl: 'https://eur-lex.europa.eu/legal-content/EL/TXT/?uri=CELEX:32024R1689',
     fullText: `ΚΑΝΟΝΙΣΜΟΣ ΓΙΑ ΤΗΝ ΤΕΧΝΗΤΗ ΝΟΗΜΟΣΥΝΗ (AI ACT)
 
 Άρθρο 1 — Αντικείμενο
@@ -156,7 +156,7 @@ export const BILL_TEXTS = {
   },
 
   'v-co2': {
-    officialUrl: 'https://eur-lex.europa.eu/',
+    officialUrl: 'https://eur-lex.europa.eu/legal-content/EL/TXT/?uri=CELEX:32023R0851',
     fullText: `ΚΑΝΟΝΙΣΜΟΣ ΓΙΑ ΤΗ ΜΕΙΩΣΗ ΕΚΠΟΜΠΩΝ CO₂ ΑΠΟ ΝΕΑ ΟΧΗΜΑΤΑ
 
 Άρθρο 1 — Στόχος μηδενικών εκπομπών

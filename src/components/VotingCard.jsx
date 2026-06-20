@@ -22,8 +22,8 @@ export function VotingCard({ voting }) {
           {closed ? (
             <span className="chip bg-slate-100 text-slate-500">Ολοκληρώθηκε</span>
           ) : (
-            <span className="chip bg-emerald-100 text-emerald-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <span className="chip bg-indigo-100 text-indigo-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
               Ανοιχτό
             </span>
           )}
