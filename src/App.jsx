@@ -4,6 +4,7 @@ import { WelcomeLogin } from './screens/WelcomeLogin.jsx'
 import { SignUp } from './screens/SignUp.jsx'
 import { CreateCredentials } from './screens/CreateCredentials.jsx'
 import { ResetCredentials } from './screens/ResetCredentials.jsx'
+import { Terms } from './screens/Terms.jsx'
 import { AppLayout } from './screens/AppLayout.jsx'
 import { MainPage } from './screens/MainPage.jsx'
 import { VotingPage } from './screens/VotingPage.jsx'
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/signup" element={<SignUp />} />
         <Route path="/create-credentials" element={<CreateCredentials />} />
         <Route path="/reset" element={<ResetCredentials />} />
+        <Route path="/terms" element={<Terms />} />
 
         {/* Εφαρμογή (απαιτεί σύνδεση) */}
         <Route path="/app" element={<AppLayout />}>

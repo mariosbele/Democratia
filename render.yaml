@@ -1,0 +1,38 @@
+# Render Blueprint για το backend της Democratia.
+# Στο Render: New → Blueprint → επίλεξε το repo. Διαβάζει αυτό το αρχείο.
+#
+# Σημείωση: ο persistent disk απαιτεί πληρωμένο plan. Στο free plan, αφαίρεσε
+# το μπλοκ `disk` και το DB_PATH — η βάση θα είναι εφήμερη (θα ξαναγεμίζει από
+# seed + συγχρονισμό σε κάθε deploy).
+services:
+  - type: web
+    name: democratia-api
+    runtime: docker
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    plan: starter
+    envVars:
+      - key: VOTER_SECRET
+        generateValue: true # ασφαλές τυχαίο μυστικό
+      - key: ADMIN_TOKEN
+        generateValue: true # κωδικός για τη σελίδα /admin
+      - key: AUTH_SECRET
+        generateValue: true # μυστικό ταυτοποίησης (hash ΑΦΜ/OTP, sessions)
+      - key: NODE_ENV
+        value: production
+
+      - key: SYNC_SOURCES
+        value: europarl,hellenic
+      - key: SYNC_INTERVAL_MS
+        value: "21600000" # 6 ώρες
+      - key: HELLENIC_FEED_URL
+        value: "" # όρισέ το όταν έχεις feed Βουλής (δες server/README.md)
+      - key: CORS_ORIGIN
+        value: "*" # περιόρισέ το στο origin του frontend σου σε production
+      - key: DB_PATH
+        value: /var/data/democratia.db
+    disk:
+      name: democratia-data
+      mountPath: /var/data
+      sizeGB: 1

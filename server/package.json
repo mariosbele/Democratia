@@ -1,0 +1,19 @@
+{
+  "name": "democratia-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Backend της Democratia — αυτόματη διασύνδεση ψηφισμάτων Βουλής & Ευρωβουλής και των αποτελεσμάτων τους (Node.js built-ins, SQLite).",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node --experimental-sqlite src/index.js",
+    "dev": "node --watch --experimental-sqlite src/index.js",
+    "migrate": "node --experimental-sqlite src/db/migrate.js",
+    "seed": "node --experimental-sqlite src/seed/seed.js",
+    "sync": "node --experimental-sqlite src/services/sync/cli.js",
+    "scrape:hellenic": "node src/services/sync/scrapers/cli.js",
+    "test": "node --experimental-sqlite --test"
+  }
+}

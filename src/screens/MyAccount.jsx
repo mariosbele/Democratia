@@ -37,11 +37,32 @@ function QAGlyph({ className = 'h-5 w-5' }) {
 }
 
 export function MyAccount() {
-  const { currentUser, following, logout } = useApp()
+  const { currentUser, following, logout, exportMyData, deleteMyAccount } = useApp()
   const navigate = useNavigate()
 
   function handleLogout() {
     logout()
+    navigate('/')
+  }
+
+  async function handleExport() {
+    try {
+      const data = await exportMyData()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'democratia-ta-dedomena-mou.json'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('Δεν ήταν δυνατή η εξαγωγή των δεδομένων αυτή τη στιγμή.')
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm('Διαγραφή λογαριασμού και όλων των στοιχείων ταυτότητας; Η ενέργεια είναι μη αναστρέψιμη.')) return
+    await deleteMyAccount()
     navigate('/')
   }
 
@@ -83,6 +104,21 @@ export function MyAccount() {
               <IconChevron className="h-5 w-5 text-slate-300" />
             </Link>
           ))}
+        </div>
+
+        {/* GDPR: τα δεδομένα μου */}
+        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-card">
+          <div className="border-b border-slate-100 px-4 py-2.5">
+            <p className="text-sm font-bold text-ink">Τα δεδομένα μου (GDPR)</p>
+            <p className="text-[11px] text-slate-500">Δικαίωμα πρόσβασης & διαγραφής</p>
+          </div>
+          <button onClick={handleExport} className="flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3.5 text-left transition hover:bg-slate-50">
+            <span className="flex-1 text-sm font-medium text-ink">Εξαγωγή των δεδομένων μου</span>
+            <span className="text-xs text-slate-400">JSON</span>
+          </button>
+          <button onClick={handleDelete} className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-rose-600 transition hover:bg-rose-50">
+            <span className="flex-1 text-sm font-medium">Διαγραφή λογαριασμού & δεδομένων</span>
+          </button>
         </div>
 
         <button

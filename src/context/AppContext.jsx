@@ -7,10 +7,15 @@ import {
   SOCIETIES,
   VOTINGS,
 } from '../data/mockData.js'
+import * as api from '../lib/api.js'
+import * as auth from '../lib/auth.js'
 
 const AppContext = createContext(null)
 
 const STORAGE_KEY = 'democratia.state.v1'
+
+// Τρέχουσα έκδοση όρων/πολιτικής (συμβαδίζει με τον server: POLICY_VERSION).
+export const POLICY_VERSION = '2025-06-01'
 
 // Φόρτωση αποθηκευμένης κατάστασης (ώστε οι ψήφοι/σχόλια να παραμένουν μετά από refresh)
 function loadState() {
@@ -30,11 +35,28 @@ const defaultSettings = {
   newsletter: false,
 }
 
+// Αρχικά δεδομένα από τα mock — αντικαθίστανται από το API (αν είναι ενεργό).
+const MOCK_DATA = {
+  societies: SOCIETIES,
+  votings: VOTINGS,
+  comments: COMMENTS,
+  people: PEOPLE,
+  notifications: NOTIFICATIONS,
+}
+
 export function AppProvider({ children }) {
   const saved = loadState()
 
-  const [isAuthenticated, setIsAuthenticated] = useState(saved?.isAuthenticated ?? false)
+  // Συνεδρία: { token, account: { id, fullName, ageVerified } } ή null.
+  const [session, setSession] = useState(saved?.session ?? null)
+  const isAuthenticated = !!session
+  // Έκδοση όρων που έχει αποδεχθεί ο χρήστης (για GDPR consent gate).
+  const [consentVersion, setConsentVersion] = useState(saved?.consentVersion ?? null)
   const [activeSociety, setActiveSociety] = useState(saved?.activeSociety ?? SOCIETIES[0].id)
+
+  // Πηγή δεδομένων: ξεκινά με mock, αντικαθίσταται από το API αν οριστεί VITE_API_URL.
+  const [data, setData] = useState(MOCK_DATA)
+  const [dataSource, setDataSource] = useState(api.isApiEnabled() ? 'loading' : 'mock')
 
   // ψήφοι: { [votingId]: 'yes' | 'no' | 'present' }
   const [votes, setVotes] = useState(saved?.votes ?? {})
@@ -46,10 +68,38 @@ export function AppProvider({ children }) {
   const [following, setFollowing] = useState(saved?.following ?? [])
   const [settings, setSettings] = useState(saved?.settings ?? defaultSettings)
 
+  // Αν είναι ενεργό το backend, φόρτωσε όλα τα δεδομένα από το /api/bootstrap.
+  // Σε αποτυχία, παραμένουν τα mock δεδομένα (graceful fallback).
+  useEffect(() => {
+    if (!api.isApiEnabled()) return
+    let cancelled = false
+    api
+      .fetchBootstrap()
+      .then((payload) => {
+        if (cancelled) return
+        setData({
+          societies: payload.societies?.length ? payload.societies : SOCIETIES,
+          votings: payload.votings ?? [],
+          comments: payload.comments ?? {},
+          people: payload.people ?? PEOPLE,
+          notifications: payload.notifications ?? [],
+        })
+        setDataSource('api')
+      })
+      .catch((err) => {
+        console.warn('[Democratia] Αποτυχία σύνδεσης με το API — χρήση mock δεδομένων.', err)
+        if (!cancelled) setDataSource('mock')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   // Αποθήκευση κατάστασης σε κάθε αλλαγή
   useEffect(() => {
     const state = {
-      isAuthenticated,
+      session,
+      consentVersion,
       activeSociety,
       votes,
       userComments,
@@ -58,23 +108,71 @@ export function AppProvider({ children }) {
       settings,
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-  }, [isAuthenticated, activeSociety, votes, userComments, likedComments, following, settings])
+  }, [session, consentVersion, activeSociety, votes, userComments, likedComments, following, settings])
 
   // ── Ενέργειες ────────────────────────────────────────────────────────────
+  // Ολοκλήρωση πραγματικής σύνδεσης (μετά Taxisnet + OTP).
+  function completeLogin(token, account) {
+    setSession({ token, account })
+  }
+
+  // Γρήγορη σύνδεση επίδειξης (για τις οθόνες προσομοίωσης εγγραφής).
   function login() {
-    setIsAuthenticated(true)
+    const demo = auth.DUMMY_CITIZENS[0]
+    setSession({ token: 'sim-' + demo.afm, account: { id: 'sim-' + demo.afm, fullName: demo.fullName, ageVerified: true } })
   }
 
   function logout() {
-    setIsAuthenticated(false)
+    auth.logout(session?.token)
+    setSession(null)
+  }
+
+  // Αποδοχή όρων/πολιτικής (GDPR). Καταγράφεται και στον server (αν είναι ενεργός).
+  function acceptConsent() {
+    setConsentVersion(POLICY_VERSION)
+    auth.recordConsent('terms', true, session?.token)
+    auth.recordConsent('privacy', true, session?.token)
+  }
+  const hasConsented = consentVersion === POLICY_VERSION
+
+  // GDPR: εξαγωγή & διαγραφή δεδομένων.
+  function exportMyData() {
+    return auth.exportData(session?.token, session?.account)
+  }
+  async function deleteMyAccount() {
+    await auth.deleteAccount(session?.token)
+    // Καθαρισμός τοπικών δεδομένων
+    setSession(null)
+    setVotes({})
+    setUserComments({})
+    setLikedComments([])
+    setFollowing([])
   }
 
   // Η ψήφος είναι αμετάκλητη: αν υπάρχει ήδη, δεν αλλάζει.
+  // Με ενεργό backend, στέλνεται ανώνυμα στο API· σε σφάλμα «κλειστού» ψηφίσματος
+  // δεν καταγράφεται τοπικά.
   function castVote(votingId, choice) {
-    setVotes((prev) => {
-      if (prev[votingId]) return prev
-      return { ...prev, [votingId]: choice }
-    })
+    if (votes[votingId]) return
+    // Όταν είναι συνδεδεμένος, η ψήφος δένεται με τον λογαριασμό (μία ανά πολίτη)·
+    // αλλιώς με ανώνυμο token συσκευής. Σε καμία περίπτωση δεν αποθηκεύεται PII.
+    const voterToken = session?.account?.id ?? api.getVoterToken()
+    if (api.isApiEnabled()) {
+      api
+        .castVote(votingId, choice, voterToken)
+        .then(() => setVotes((prev) => (prev[votingId] ? prev : { ...prev, [votingId]: choice })))
+        .catch((err) => {
+          const msg = String(err?.message ?? '')
+          if (msg.includes('already_voted')) {
+            // Είχε ήδη ψηφίσει (π.χ. από άλλη συσκευή) — αποτύπωσέ το τοπικά.
+            setVotes((prev) => (prev[votingId] ? prev : { ...prev, [votingId]: choice }))
+          } else {
+            console.warn('[Democratia] Η ψήφος δεν καταχωρήθηκε:', msg)
+          }
+        })
+      return
+    }
+    setVotes((prev) => (prev[votingId] ? prev : { ...prev, [votingId]: choice }))
   }
 
   // Ένα σχόλιο ανά ψήφισμα, έως 1000 χαρακτήρες.
@@ -121,13 +219,18 @@ export function AppProvider({ children }) {
 
   // ── Παράγωγα δεδομένα ──────────────────────────────────────────────────────
   const votingsForSociety = useMemo(
-    () => VOTINGS.filter((v) => v.society === activeSociety),
-    [activeSociety],
+    () => data.votings.filter((v) => v.society === activeSociety),
+    [data.votings, activeSociety],
   )
 
-  // Συγκεντρωτικά σχόλια ανά ψήφισμα (mock + σχόλιο χρήστη)
+  // Εύρεση ψηφίσματος με βάση το id (από την τρέχουσα πηγή δεδομένων).
+  function getVoting(id) {
+    return data.votings.find((v) => v.id === id)
+  }
+
+  // Συγκεντρωτικά σχόλια ανά ψήφισμα (βάση + σχόλιο χρήστη)
   function getComments(votingId) {
-    const base = COMMENTS[votingId] ? [...COMMENTS[votingId]] : []
+    const base = data.comments[votingId] ? [...data.comments[votingId]] : []
     const mine = userComments[votingId]
     if (mine && !mine.deleted) {
       base.unshift({
@@ -144,8 +247,9 @@ export function AppProvider({ children }) {
 
   // Ιστορικό: ψηφίσματα που ο χρήστης ψήφισε ή σχολίασε
   const history = useMemo(() => {
-    return VOTINGS.filter((v) => votes[v.id] || (userComments[v.id] && !userComments[v.id].deleted)).map(
-      (v) => {
+    return data.votings
+      .filter((v) => votes[v.id] || (userComments[v.id] && !userComments[v.id].deleted))
+      .map((v) => {
         const didVote = !!votes[v.id]
         const didComment = !!(userComments[v.id] && !userComments[v.id].deleted)
         let action = 'Συμμετοχή'
@@ -153,28 +257,40 @@ export function AppProvider({ children }) {
         else if (didVote) action = 'Ψήφος'
         else if (didComment) action = 'Σχόλιο'
         return { voting: v, action, date: userComments[v.id]?.createdAt || v.uploadedAt }
-      },
-    )
-  }, [votes, userComments])
+      })
+  }, [data.votings, votes, userComments])
+
+  // Ταυτότητα τρέχοντος χρήστη: από τη συνεδρία όταν είναι συνδεδεμένος.
+  const currentUser = session?.account
+    ? { id: session.account.id, fullName: session.account.fullName, username: 'πολίτης', role: 'Citizen' }
+    : CURRENT_USER
 
   const value = {
     // κατάσταση
     isAuthenticated,
+    session,
+    hasConsented,
+    consentVersion,
     activeSociety,
-    societies: SOCIETIES,
+    societies: data.societies,
     votes,
     userComments,
     likedComments,
     following,
     settings,
-    people: PEOPLE,
-    currentUser: CURRENT_USER,
-    notifications: NOTIFICATIONS,
+    people: data.people,
+    currentUser,
+    notifications: data.notifications,
     votingsForSociety,
     history,
+    dataSource, // 'mock' | 'loading' | 'api'
     // ενέργειες
     login,
+    completeLogin,
     logout,
+    acceptConsent,
+    exportMyData,
+    deleteMyAccount,
     setActiveSociety,
     castVote,
     addComment,
@@ -183,6 +299,7 @@ export function AppProvider({ children }) {
     toggleFollow,
     updateSetting,
     getComments,
+    getVoting,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

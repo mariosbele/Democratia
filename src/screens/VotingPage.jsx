@@ -1,21 +1,20 @@
 import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext.jsx'
-import { VOTINGS } from '../data/mockData.js'
 import { AppHeader } from '../components/AppHeader.jsx'
 import { AiSummary } from '../components/AiSummary.jsx'
 import { ResultBars } from '../components/ResultBars.jsx'
 import { CommunityTab } from './CommunityTab.jsx'
 import { CATEGORY_COLORS, CHOICE_LABELS, formatDate, latestAnnouncedPhase } from '../lib/utils.js'
-import { IconClock, IconShare } from '../components/Icons.jsx'
+import { IconClock, IconShare, IconSparkle, IconDocument, IconExternal } from '../components/Icons.jsx'
 
 export function VotingPage() {
   const { id } = useParams()
-  const { votes, castVote } = useApp()
+  const { votes, castVote, getVoting } = useApp()
   const [tab, setTab] = useState('voting')
   const [shared, setShared] = useState(false)
 
-  const voting = useMemo(() => VOTINGS.find((v) => v.id === id), [id])
+  const voting = useMemo(() => getVoting(id), [getVoting, id])
   if (!voting) {
     return (
       <div className="flex h-full flex-col">
@@ -92,8 +91,8 @@ export function VotingPage() {
               </div>
             </div>
 
-            {/* Σύνοψη AI */}
-            <AiSummary summary={voting.aiSummary} />
+            {/* Σύνοψη AI ή πλήρες επίσημο κείμενο (επιλογή χρήστη) */}
+            <BillContent voting={voting} />
 
             {/* Ψηφοφορία / Αποτελέσματα */}
             <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-card">
@@ -138,6 +137,9 @@ export function VotingPage() {
               )}
             </div>
 
+            {/* Επίσημο αποτέλεσμα Βουλής / Ευρωκοινοβουλίου (αν έχει αντληθεί) */}
+            <OfficialResult voting={voting} />
+
             {/* Χρονοδιάγραμμα ανακοινώσεων (έως 3 φάσεις) */}
             <PhaseTimeline voting={voting} />
           </div>
@@ -158,6 +160,65 @@ export function VotingPage() {
   )
 }
 
+// Επιστρέφει το όνομα της επίσημης πηγής από την οποία αντλήθηκαν τα δεδομένα.
+function officialSourceName(voting) {
+  const url = voting.officialUrl || voting.referenceUrl || ''
+  if (url.includes('europa.eu')) return 'EUR-Lex / Ευρωκοινοβούλιο'
+  if (url.includes('hellenicparliament')) return 'Βουλή των Ελλήνων'
+  if (url.includes('diavgeia')) return 'Διαύγεια'
+  if (voting.source === 'europarl') return 'Ευρωκοινοβούλιο'
+  if (voting.source === 'hellenic') return 'Βουλή των Ελλήνων'
+  return 'επίσημη πηγή'
+}
+
+// «Σύνοψη AI» + ανακατεύθυνση στο πλήρες επίσημο κείμενο, στην επίσημη σελίδα
+// της πηγής από την οποία αντλήθηκαν τα δεδομένα.
+function BillContent({ voting }) {
+  const sourceUrl = voting.officialUrl || voting.referenceUrl
+  const sourceName = officialSourceName(voting)
+
+  return (
+    <div className="space-y-3">
+      <AiSummary summary={voting.aiSummary} />
+
+      {sourceUrl ? (
+        // Ανακατεύθυνση στην επίσημη σελίδα (αυθεντικό, πάντα ενημερωμένο κείμενο).
+        <a
+          href={sourceUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-card transition hover:border-brand-200 hover:bg-brand-50/50"
+        >
+          <span className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-700 text-white">
+              <IconDocument className="h-4 w-4" />
+            </span>
+            <span>
+              <span className="block text-sm font-semibold text-ink">Πλήρες επίσημο κείμενο</span>
+              <span className="block text-[11px] text-slate-500">
+                Άνοιγμα στην επίσημη σελίδα · {sourceName}
+              </span>
+            </span>
+          </span>
+          <IconExternal className="h-4 w-4 shrink-0 text-brand-600" />
+        </a>
+      ) : (
+        // Fallback: αν δεν υπάρχει επίσημος σύνδεσμος αλλά υπάρχει αποθηκευμένο κείμενο.
+        voting.fullText && (
+          <details className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
+            <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 text-sm font-semibold text-ink">
+              <IconDocument className="h-4 w-4 text-slate-600" /> Πλήρες κείμενο
+            </summary>
+            <pre className="whitespace-pre-wrap break-words border-t border-slate-100 px-4 py-4 font-sans text-[13px] leading-relaxed text-slate-700">
+              {voting.fullText}
+            </pre>
+          </details>
+        )
+      )}
+    </div>
+  )
+}
+
 function VoteButton({ children, onClick, variant }) {
   const styles = {
     yes: 'border-emerald-200 text-emerald-700 hover:bg-emerald-500 hover:text-white hover:border-emerald-500',
@@ -171,6 +232,73 @@ function VoteButton({ children, onClick, variant }) {
     >
       {children}
     </button>
+  )
+}
+
+const OFFICIAL_SOURCE_LABELS = {
+  municipal: 'Δημοτικό Συμβούλιο',
+  hellenic: 'Βουλή των Ελλήνων',
+  europarl: 'Ευρωκοινοβούλιο',
+}
+
+function OfficialResult({ voting }) {
+  const official = voting.official
+  if (!official || official.yes == null) return null
+
+  const total = (official.yes ?? 0) + (official.no ?? 0) + (official.abstain ?? 0)
+  const pct = (n) => (total ? Math.round((n / total) * 100) : 0)
+  const adopted = official.outcome === 'adopted'
+  const rows = [
+    { label: 'ΥΠΕΡ', value: official.yes ?? 0, color: 'bg-emerald-500' },
+    { label: 'ΚΑΤΑ', value: official.no ?? 0, color: 'bg-rose-500' },
+    { label: 'ΑΠΟΧΗ', value: official.abstain ?? 0, color: 'bg-slate-400' },
+  ]
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-card">
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-sm font-semibold text-ink">Επίσημο αποτέλεσμα</p>
+        {official.outcome && (
+          <span
+            className={`chip ${adopted ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}
+          >
+            {adopted ? 'Υπερψηφίστηκε' : 'Καταψηφίστηκε'}
+          </span>
+        )}
+      </div>
+      <div className="space-y-2">
+        {rows.map((r) => (
+          <div key={r.label}>
+            <div className="mb-0.5 flex justify-between text-xs text-slate-500">
+              <span>{r.label}</span>
+              <span>
+                {r.value.toLocaleString('el-GR')} · {pct(r.value)}%
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+              <div className={`h-full ${r.color}`} style={{ width: `${pct(r.value)}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-[11px] text-slate-400">
+        Πηγή: {OFFICIAL_SOURCE_LABELS[official.source] || 'Επίσημη πηγή'}
+        {official.decidedAt ? ` · ${formatDate(official.decidedAt)}` : ''}
+        {official.sourceUrl && (
+          <>
+            {' · '}
+            <a
+              href={official.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-brand-600 underline"
+            >
+              επίσημη πηγή
+            </a>
+          </>
+        )}
+      </p>
+    </div>
   )
 }
 
