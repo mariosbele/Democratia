@@ -36,10 +36,48 @@ function applyColumnMigrations(database) {
   }
 }
 
+// Διαχωρισμός «κάλπης» από «εκλογικό κατάλογο»: παλιές βάσεις είχαν τη στήλη
+// platform_votes.voter_hash (ψήφος + ταυτότητα στην ίδια γραμμή). Τη μεταφέρουμε
+// στον πίνακα vote_participation και ξαναχτίζουμε την κάλπη ΧΩΡΙΣ ταυτότητα.
+function migratePlatformVotes(database) {
+  const cols = database.prepare(`PRAGMA table_info(platform_votes)`).all()
+  if (!cols.some((c) => c.name === 'voter_hash')) return // ήδη νέο σχήμα
+
+  database.exec('BEGIN')
+  try {
+    // Μεταφορά της «συμμετοχής» (ποιος ψήφισε) — χωρίς να ξέρουμε λογαριασμό.
+    database.exec(
+      `INSERT OR IGNORE INTO vote_participation (voting_id, account_id, voter_hash, created_at)
+       SELECT voting_id, NULL, voter_hash, created_at FROM platform_votes`,
+    )
+    // Ξαναχτίσιμο της κάλπης χωρίς voter_hash (μένει μόνο η επιλογή).
+    database.exec(`ALTER TABLE platform_votes RENAME TO platform_votes_old`)
+    database.exec(
+      `CREATE TABLE platform_votes (
+         id         INTEGER PRIMARY KEY AUTOINCREMENT,
+         voting_id  TEXT NOT NULL REFERENCES votings(id) ON DELETE CASCADE,
+         choice     TEXT NOT NULL CHECK (choice IN ('yes','no','present')),
+         created_at TEXT NOT NULL
+       )`,
+    )
+    database.exec(
+      `INSERT INTO platform_votes (voting_id, choice, created_at)
+       SELECT voting_id, choice, created_at FROM platform_votes_old`,
+    )
+    database.exec(`DROP TABLE platform_votes_old`)
+    database.exec(`CREATE INDEX IF NOT EXISTS idx_platform_votes_voting ON platform_votes(voting_id)`)
+    database.exec('COMMIT')
+  } catch (err) {
+    database.exec('ROLLBACK')
+    throw err
+  }
+}
+
 export function migrate(database = getDb()) {
   const schema = fs.readFileSync(SCHEMA_PATH, 'utf8')
   database.exec(schema)
   applyColumnMigrations(database)
+  migratePlatformVotes(database)
   return database
 }
 

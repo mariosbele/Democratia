@@ -44,26 +44,14 @@ test('ανήλικος → απόρριψη με έλεγχο ηλικίας', a
   assert.equal((await r.json()).error, 'underage')
 })
 
-test('πλήρης ροή: Taxisnet → OTP → συνεδρία → me → logout', async () => {
-  const start = await post('/api/auth/taxisnet/start', { username: 'mbelechris', password: 'Demo!2024' })
-  assert.equal(start.status, 200)
-  const s = await start.json()
-  assert.ok(s.challengeId)
-  assert.ok(/^\d{6}$/.test(s.otp), 'σε προσομοίωση επιστρέφεται OTP')
-  assert.ok(s.phoneHint.includes('•'), 'το τηλέφωνο εμφανίζεται κρυμμένο')
-
-  // λάθος OTP
-  const bad = await post('/api/auth/taxisnet/verify', { challengeId: s.challengeId, code: '000000' })
-  // (μικρή πιθανότητα σύμπτωσης· αν συμπέσει, το παρακάτω verify θα αποτύχει — αμελητέο)
-  if (bad.status === 201) return
-
-  const ver = await post('/api/auth/taxisnet/verify', {
-    challengeId: s.challengeId,
-    code: s.otp,
+test('πλήρης ροή: απευθείας Taxisnet → συνεδρία → me → logout', async () => {
+  const start = await post('/api/auth/taxisnet/start', {
+    username: 'mbelechris',
+    password: 'Demo!2024',
     consent: true,
   })
-  assert.equal(ver.status, 201)
-  const v = await ver.json()
+  assert.equal(start.status, 201)
+  const v = await start.json()
   assert.ok(v.token)
   assert.equal(v.account.fullName, 'Μάριος Μπελεχρής')
   assert.equal(v.account.ageVerified, true)
@@ -83,16 +71,13 @@ test('πλήρης ροή: Taxisnet → OTP → συνεδρία → me → logo
 })
 
 test('μοναδικότητα λογαριασμού ανά πολίτη (ίδιο ΑΦΜ → ίδιος λογαριασμός)', async () => {
-  const login = async () => {
-    const s = await (await post('/api/auth/taxisnet/start', { username: 'epapadopoulou', password: 'Demo!2024' })).json()
-    return (await (await post('/api/auth/taxisnet/verify', { challengeId: s.challengeId, code: s.otp })).json()).account.id
-  }
+  const login = async () =>
+    (await (await post('/api/auth/taxisnet/start', { username: 'epapadopoulou', password: 'Demo!2024' })).json()).account.id
   assert.equal(await login(), await login())
 })
 
 test('δικαίωμα διαγραφής (GDPR): ο λογαριασμός σβήνεται', async () => {
-  const s = await (await post('/api/auth/taxisnet/start', { username: 'gathanasiou', password: 'Demo!2024' })).json()
-  const v = await (await post('/api/auth/taxisnet/verify', { challengeId: s.challengeId, code: s.otp })).json()
+  const v = await (await post('/api/auth/taxisnet/start', { username: 'gathanasiou', password: 'Demo!2024' })).json()
   const del = await fetch(base + '/api/me', { method: 'DELETE', headers: { Authorization: 'Bearer ' + v.token } })
   assert.equal(del.status, 200)
   // η συνεδρία ακυρώθηκε

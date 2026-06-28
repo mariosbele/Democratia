@@ -13,12 +13,12 @@
 export const MIN_VOTING_AGE = 17
 
 export const TAXISNET_CITIZENS = [
-  { username: 'mbelechris',    password: 'Demo!2024', afm: '123456782', fullName: 'Μάριος Μπελεχρής',     birthDate: '1990-05-12', phone: '+306971111111' },
-  { username: 'epapadopoulou', password: 'Demo!2024', afm: '234567893', fullName: 'Ελένη Παπαδοπούλου',   birthDate: '1985-09-23', phone: '+306972222222' },
-  { username: 'gathanasiou',   password: 'Demo!2024', afm: '345678901', fullName: 'Γιώργος Αθανασίου',    birthDate: '1978-02-03', phone: '+306973333333' },
-  { username: 'mnikolaou',     password: 'Demo!2024', afm: '456789012', fullName: 'Μαρία Νικολάου',       birthDate: '2005-11-30', phone: '+306974444444' },
+  { username: 'mbelechris',    password: 'Demo!2024', afm: '123456782', fullName: 'Μάριος Μπελεχρής',     birthDate: '1990-05-12' },
+  { username: 'epapadopoulou', password: 'Demo!2024', afm: '234567893', fullName: 'Ελένη Παπαδοπούλου',   birthDate: '1985-09-23' },
+  { username: 'gathanasiou',   password: 'Demo!2024', afm: '345678901', fullName: 'Γιώργος Αθανασίου',    birthDate: '1978-02-03' },
+  { username: 'mnikolaou',     password: 'Demo!2024', afm: '456789012', fullName: 'Μαρία Νικολάου',       birthDate: '2005-11-30' },
   // Ανήλικος — για δοκιμή του ελέγχου ηλικίας (θα ΑΠΟΡΡΙΦΘΕΙ):
-  { username: 'anilikos',      password: 'Demo!2024', afm: '567890123', fullName: 'Ανήλικος Δοκιμαστικός', birthDate: '2012-01-01', phone: '+306975555555' },
+  { username: 'anilikos',      password: 'Demo!2024', afm: '567890123', fullName: 'Ανήλικος Δοκιμαστικός', birthDate: '2012-01-01' },
 ]
 
 export function ageFromBirthDate(birthDate, now = new Date()) {

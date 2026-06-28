@@ -111,7 +111,7 @@ export function AppProvider({ children }) {
   }, [session, consentVersion, activeSociety, votes, userComments, likedComments, following, settings])
 
   // ── Ενέργειες ────────────────────────────────────────────────────────────
-  // Ολοκλήρωση πραγματικής σύνδεσης (μετά Taxisnet + OTP).
+  // Ολοκλήρωση σύνδεσης (απευθείας μέσω Taxisnet).
   function completeLogin(token, account) {
     setSession({ token, account })
   }
@@ -154,12 +154,13 @@ export function AppProvider({ children }) {
   // δεν καταγράφεται τοπικά.
   function castVote(votingId, choice) {
     if (votes[votingId]) return
-    // Όταν είναι συνδεδεμένος, η ψήφος δένεται με τον λογαριασμό (μία ανά πολίτη)·
-    // αλλιώς με ανώνυμο token συσκευής. Σε καμία περίπτωση δεν αποθηκεύεται PII.
-    const voterToken = session?.account?.id ?? api.getVoterToken()
+    // Όταν είναι συνδεδεμένος, ο server ταυτοποιεί τον λογαριασμό από το token της
+    // συνεδρίας (μία ψήφος ανά πολίτη)· αλλιώς χρησιμοποιείται ανώνυμο token
+    // συσκευής. Σε καμία περίπτωση δεν αποθηκεύεται η επιλογή μαζί με την ταυτότητα.
+    const voterToken = api.getVoterToken()
     if (api.isApiEnabled()) {
       api
-        .castVote(votingId, choice, voterToken)
+        .castVote(votingId, choice, voterToken, session?.token)
         .then(() => setVotes((prev) => (prev[votingId] ? prev : { ...prev, [votingId]: choice })))
         .catch((err) => {
           const msg = String(err?.message ?? '')

@@ -18,7 +18,7 @@ services:
       - key: ADMIN_TOKEN
         generateValue: true # κωδικός για τη σελίδα /admin
       - key: AUTH_SECRET
-        generateValue: true # μυστικό ταυτοποίησης (hash ΑΦΜ/OTP, sessions)
+        generateValue: true # μυστικό ταυτοποίησης (hash ΑΦΜ, sessions)
       - key: NODE_ENV
         value: production
 

@@ -28,14 +28,9 @@ export const config = {
   isProduction: process.env.NODE_ENV === 'production',
 
   auth: {
-    // Μυστικό για HMAC (hash ΑΦΜ/OTP) & υπογραφές. ΑΛΛΑΞΕ το σε production.
+    // Μυστικό για HMAC (hash ΑΦΜ) & session tokens. ΑΛΛΑΞΕ το σε production.
     secret: process.env.AUTH_SECRET ?? process.env.VOTER_SECRET ?? 'dev-only-change-me',
     sessionTtlMs: Number(process.env.SESSION_TTL_MS ?? 7 * 24 * 60 * 60 * 1000), // 7 ημέρες
-    otpTtlMs: Number(process.env.OTP_TTL_MS ?? 5 * 60 * 1000), // 5 λεπτά
-    otpMaxAttempts: Number(process.env.OTP_MAX_ATTEMPTS ?? 5),
-    // Σε προσομοίωση επιστρέφουμε το OTP στην απόκριση (δεν στέλνουμε SMS).
-    // Σε production όρισε SIMULATE_OTP=false και σύνδεσε πραγματικό πάροχο.
-    simulateOtp: (process.env.SIMULATE_OTP ?? 'true') !== 'false',
   },
 
   // Τρέχουσα έκδοση όρων/πολιτικής (για το αρχείο συγκαταθέσεων GDPR).

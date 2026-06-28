@@ -17,7 +17,7 @@ import { serializeVoting } from '../serializers/voting.js'
 import { syncAll, syncSource } from '../services/sync/index.js'
 import { ok, created, badRequest, notFound, tooMany } from './respond.js'
 import { allow } from '../services/security/rateLimit.js'
-import { clientIp } from './authRoutes.js'
+import { clientIp, currentAccount } from './authRoutes.js'
 
 const societyDto = (s) => ({ id: s.id, name: s.name, level: s.level })
 
@@ -89,11 +89,17 @@ export function registerRoutes(router) {
       return tooMany(res, 'rate_limited')
     }
     const { choice, voterToken } = req.body ?? {}
-    if (!choice || !voterToken) return badRequest(res, 'choice_and_voterToken_required')
-    if (typeof voterToken !== 'string' || voterToken.length > 200) {
+    if (!choice) return badRequest(res, 'choice_required')
+    // Η ταυτότητα έρχεται από τη ΣΥΝΕΔΡΙΑ (αξιόπιστη), όχι από το σώμα. Χωρίς
+    // σύνδεση, δεχόμαστε ανώνυμο token συσκευής (δωρεάν/mock λειτουργία).
+    const account = currentAccount(req)
+    if (!account && (typeof voterToken !== 'string' || !voterToken || voterToken.length > 200)) {
       return badRequest(res, 'invalid_voter_token')
     }
-    const result = castPlatformVote(req.params.id, choice, voterToken)
+    const result = castPlatformVote(req.params.id, choice, {
+      accountId: account?.id ?? null,
+      deviceToken: account ? null : voterToken,
+    })
     if (!result.ok) {
       const status = result.reason === 'not_found' ? 404 : 400
       return status === 404 ? notFound(res, 'voting_not_found') : badRequest(res, result.reason)
@@ -102,9 +108,10 @@ export function registerRoutes(router) {
   })
 
   router.get('/api/votings/:id/has-voted', (req, res) => {
-    const token = req.query.voterToken
-    if (!token) return badRequest(res, 'voterToken_required')
-    ok(res, { voted: hasVoted(req.params.id, token) })
+    const account = currentAccount(req)
+    const voterId = account?.id ?? req.query.voterToken
+    if (!voterId) return badRequest(res, 'voterToken_required')
+    ok(res, { voted: hasVoted(req.params.id, voterId) })
   })
 
   router.get('/api/votings/:id/comments', (req, res) => {

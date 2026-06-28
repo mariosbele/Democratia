@@ -1,13 +1,20 @@
-import { getDb } from '../db/index.js'
+import { getDb, tx } from '../db/index.js'
 import { hashVoter } from '../services/voterToken.js'
 
 const nowIso = () => new Date().toISOString()
 
 // ── Ψήφοι πλατφόρμας (ανώνυμες, αμετάκλητες) ────────────────────────────────
+//
+// Μοντέλο «εθνικών εκλογών»: η ψήφος (τι) και η συμμετοχή (ποιος) γράφονται σε
+// ΔΥΟ ΞΕΧΩΡΙΣΤΟΥΣ πίνακες χωρίς κοινό κλειδί:
+//   • platform_votes      → μόνο η επιλογή (ανώνυμη «κάλπη»)
+//   • vote_participation  → ποιος ψήφισε, χωρίς την επιλογή («εκλογικός κατάλογος»)
+// Έτσι δεν μπορεί κανείς να συνδέσει πρόσωπο με ψήφο, ακόμη κι αν δει τη βάση.
 
 // Καταχωρεί μία ανώνυμη ψήφο. Επιστρέφει { ok, reason }.
-// Η ψήφος είναι αμετάκλητη: δεύτερη προσπάθεια του ίδιου ψηφοφόρου απορρίπτεται.
-export function castPlatformVote(votingId, choice, voterToken) {
+// `voter`: { accountId?, deviceToken? } — ο λογαριασμός (αν συνδεδεμένος) ή
+// ένα ανώνυμο token συσκευής. Η αμετάκλητη ψήφος: δεύτερη προσπάθεια απορρίπτεται.
+export function castPlatformVote(votingId, choice, voter) {
   if (!['yes', 'no', 'present'].includes(choice)) {
     return { ok: false, reason: 'invalid_choice' }
   }
@@ -15,15 +22,26 @@ export function castPlatformVote(votingId, choice, voterToken) {
   if (!voting) return { ok: false, reason: 'not_found' }
   if (voting.status !== 'open') return { ok: false, reason: 'closed' }
 
-  const voterHash = hashVoter(votingId, voterToken)
+  // Δέχεται είτε αντικείμενο { accountId, deviceToken } είτε σκέτο token (συσκευής).
+  const v = typeof voter === 'string' ? { deviceToken: voter } : voter ?? {}
+  const accountId = v.accountId ?? null
+  const idForHash = accountId ?? v.deviceToken
+  if (!idForHash) return { ok: false, reason: 'missing_voter' }
+  const voterHash = hashVoter(votingId, idForHash)
+
   try {
-    getDb()
-      .prepare(
-        `INSERT INTO platform_votes (voting_id, choice, voter_hash, created_at)
+    return tx((db) => {
+      // 1) Εκλογικός κατάλογος: σημειώνουμε ΟΤΙ ψήφισε (UNIQUE → μία φορά).
+      db.prepare(
+        `INSERT INTO vote_participation (voting_id, account_id, voter_hash, created_at)
          VALUES (?,?,?,?)`,
-      )
-      .run(votingId, choice, voterHash, nowIso())
-    return { ok: true }
+      ).run(votingId, accountId, voterHash, nowIso())
+      // 2) Κάλπη: ανώνυμη καταχώρηση της επιλογής (καμία σύνδεση με τον ψηφοφόρο).
+      db.prepare(
+        `INSERT INTO platform_votes (voting_id, choice, created_at) VALUES (?,?,?)`,
+      ).run(votingId, choice, nowIso())
+      return { ok: true }
+    })
   } catch (err) {
     if (String(err.message).includes('UNIQUE')) {
       return { ok: false, reason: 'already_voted' }
@@ -32,10 +50,10 @@ export function castPlatformVote(votingId, choice, voterToken) {
   }
 }
 
-export function hasVoted(votingId, voterToken) {
-  const voterHash = hashVoter(votingId, voterToken)
+export function hasVoted(votingId, voterId) {
+  const voterHash = hashVoter(votingId, voterId)
   const row = getDb()
-    .prepare('SELECT 1 AS x FROM platform_votes WHERE voting_id = ? AND voter_hash = ?')
+    .prepare('SELECT 1 AS x FROM vote_participation WHERE voting_id = ? AND voter_hash = ?')
     .get(votingId, voterHash)
   return !!row
 }

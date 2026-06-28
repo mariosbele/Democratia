@@ -1,7 +1,7 @@
-import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto'
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { config } from '../config.js'
 
-// HMAC (μη αναστρέψιμο) με το μυστικό ταυτοποίησης — για ΑΦΜ, OTP, session tokens.
+// HMAC (μη αναστρέψιμο) με το μυστικό ταυτοποίησης — για ΑΦΜ & session tokens.
 export function hmac(value) {
   return createHmac('sha256', config.auth.secret).update(String(value)).digest('hex')
 }
@@ -9,11 +9,6 @@ export function hmac(value) {
 // Τυχαίο, μη προβλέψιμο token (για session).
 export function randomToken(bytes = 32) {
   return randomBytes(bytes).toString('hex')
-}
-
-// Εξαψήφιο OTP (κρυπτογραφικά τυχαίο).
-export function randomOtp() {
-  return String(randomInt(0, 1_000_000)).padStart(6, '0')
 }
 
 // Σύγκριση σταθερού χρόνου (αποτρέπει timing attacks σε tokens/κωδικούς).

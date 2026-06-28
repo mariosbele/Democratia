@@ -2,6 +2,7 @@ import { config } from '../config.js'
 import { getSociety } from '../models/societies.js'
 import { upsertVoting, upsertPhase, listPhases, deleteVoting, getVoting } from '../models/votings.js'
 import { upsertOfficialResult } from '../models/results.js'
+import { fullReport } from '../models/reports.js'
 import { buildSummary } from '../services/summary.js'
 import { buildPhaseSchedule } from '../services/phases.js'
 import { serializeVoting } from '../serializers/voting.js'
@@ -47,6 +48,12 @@ export function registerAdminRoutes(router) {
   router.get('/api/admin/ping', (req, res) => {
     if (!guard(req, res)) return
     ok(res, { ok: true })
+  })
+
+  // Reports / στατιστικά (μόνο αριθμοί — ποτέ «τι ψήφισε ο Χ»).
+  router.get('/api/admin/reports', (req, res) => {
+    if (!guard(req, res)) return
+    ok(res, fullReport())
   })
 
   // Δημιουργία/ενημέρωση ψηφίσματος (+ προαιρετικό επίσημο αποτέλεσμα).

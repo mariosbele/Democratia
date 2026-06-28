@@ -60,19 +60,36 @@ CREATE TABLE IF NOT EXISTS phases (
   UNIQUE (voting_id, ordinal)
 );
 
--- Ανώνυμες ψήφοι πολιτών στην πλατφόρμα.
--- voter_hash = μη αναστρέψιμο hash (HMAC) ώστε κάθε χρήστης να ψηφίζει μία φορά
--- ανά ψήφισμα, χωρίς να αποθηκεύεται κανένα προσωπικό στοιχείο.
+-- «ΚΑΛΠΗ»: ανώνυμες ψήφοι πολιτών (τι ψηφίστηκε).
+-- ΔΕΝ περιέχει κανένα αναγνωριστικό ψηφοφόρου — μόνο την επιλογή. Έτσι, ακόμη
+-- και σε πλήρη διαρροή (βάση + μυστικά), η ψήφος ΔΕΝ μπορεί να συνδεθεί με
+-- πρόσωπο. Το «ποιος ψήφισε» τηρείται χωριστά στον πίνακα vote_participation.
 CREATE TABLE IF NOT EXISTS platform_votes (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   voting_id  TEXT NOT NULL REFERENCES votings(id) ON DELETE CASCADE,
   choice     TEXT NOT NULL CHECK (choice IN ('yes','no','present')),
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_platform_votes_voting ON platform_votes(voting_id);
+
+-- «ΕΚΛΟΓΙΚΟΣ ΚΑΤΑΛΟΓΟΣ»: ποιος ψήφισε (ΧΩΡΙΣ την επιλογή του).
+-- Χρησιμεύει για: (α) «ένας ψηφοφόρος, μία ψήφος» ανά ψήφισμα, (β) να ξέρουμε
+-- ΟΤΙ ψήφισε κάποιος (όπως στις εθνικές εκλογές), (γ) reports συμμετοχής.
+-- account_id: ο συνδεδεμένος λογαριασμός (NULL για ανώνυμη ψήφο συσκευής ή μετά
+-- από διαγραφή λογαριασμού — η συμμετοχή μένει μετρημένη, ο σύνδεσμος ταυτότητας φεύγει).
+-- voter_hash: HMAC του αναγνωριστικού, μόνο για τον έλεγχο μοναδικότητας.
+CREATE TABLE IF NOT EXISTS vote_participation (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  voting_id  TEXT NOT NULL REFERENCES votings(id) ON DELETE CASCADE,
+  account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
   voter_hash TEXT NOT NULL,
   created_at TEXT NOT NULL,
   UNIQUE (voting_id, voter_hash)
 );
 
-CREATE INDEX IF NOT EXISTS idx_platform_votes_voting ON platform_votes(voting_id);
+CREATE INDEX IF NOT EXISTS idx_participation_voting ON vote_participation(voting_id);
+CREATE INDEX IF NOT EXISTS idx_participation_account ON vote_participation(account_id);
 
 -- Επίσημο αποτέλεσμα από Βουλή / Ευρωκοινοβούλιο (αντλείται αυτόματα).
 CREATE TABLE IF NOT EXISTS official_results (
@@ -149,18 +166,6 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_account ON sessions(account_id);
-
--- Προσωρινές προκλήσεις OTP (δεύτερος παράγοντας). Σβήνονται μετά τη χρήση/λήξη.
-CREATE TABLE IF NOT EXISTS otp_challenges (
-  id          TEXT PRIMARY KEY,
-  afm_hash    TEXT NOT NULL,
-  full_name   TEXT NOT NULL,
-  age_verified INTEGER NOT NULL DEFAULT 0,
-  code_hash   TEXT NOT NULL,               -- HMAC του OTP (όχι ο ίδιος ο κωδικός)
-  attempts    INTEGER NOT NULL DEFAULT 0,
-  created_at  TEXT NOT NULL,
-  expires_at  TEXT NOT NULL
-);
 
 -- Αρχείο συγκαταθέσεων (GDPR — απόδειξη συναίνεσης σε όρους/πολιτική).
 CREATE TABLE IF NOT EXISTS consents (

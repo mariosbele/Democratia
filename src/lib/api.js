@@ -47,11 +47,9 @@ async function del(path, token) {
   return data
 }
 
-// ── Ταυτοποίηση (Taxisnet → OTP) ─────────────────────────────────────────────
-export const authStart = (username, password) =>
-  post('/api/auth/taxisnet/start', { username, password })
-export const authVerify = (challengeId, code, consent) =>
-  post('/api/auth/taxisnet/verify', { challengeId, code, consent })
+// ── Ταυτοποίηση (απευθείας Taxisnet → συνεδρία) ──────────────────────────────
+export const authStart = (username, password, consent) =>
+  post('/api/auth/taxisnet/start', { username, password, consent })
 export const authMe = (token) => authedGet('/api/auth/me', token)
 export const authLogout = (token) => post('/api/auth/logout', {}, token)
 
@@ -71,12 +69,13 @@ export const fetchVoting = (id) => get(`/api/votings/${id}`)
 export const fetchResults = (id) => get(`/api/votings/${id}/results`)
 export const fetchComments = (id) => get(`/api/votings/${id}/comments`)
 
-// Ανώνυμη ψήφος. Το voterToken είναι opaque αναγνωριστικό συσκευής/συνεδρίας.
-export const castVote = (id, choice, voterToken) =>
-  post(`/api/votings/${id}/vote`, { choice, voterToken })
+// Ανώνυμη ψήφος. Όταν υπάρχει `token` (συνεδρία), ο server ταυτοποιεί τον
+// λογαριασμό από αυτό· το voterToken (συσκευής) είναι εφεδρικό για μη συνδεδεμένους.
+export const castVote = (id, choice, voterToken, token) =>
+  post(`/api/votings/${id}/vote`, { choice, voterToken }, token)
 
-export const hasVoted = (id, voterToken) =>
-  get(`/api/votings/${id}/has-voted?voterToken=${encodeURIComponent(voterToken)}`)
+export const hasVoted = (id, voterToken, token) =>
+  authedGet(`/api/votings/${id}/has-voted?voterToken=${encodeURIComponent(voterToken)}`, token)
 
 // Δημιουργεί/ανακτά σταθερό ανώνυμο token συσκευής (localStorage).
 export function getVoterToken() {

@@ -1,5 +1,5 @@
 import { config } from '../config.js'
-import { startLogin, verifyOtp, publicAccount } from '../auth/service.js'
+import { login, publicAccount } from '../auth/service.js'
 import {
   accountForToken,
   destroySession,
@@ -45,24 +45,15 @@ const limited = (req, res, key, limit, windowMs) => {
 }
 
 export function registerAuthRoutes(router) {
-  // Βήμα 1 — σύνδεση μέσω (προσομοιωμένου) Taxisnet → αποστολή OTP.
+  // Σύνδεση μέσω Taxisnet (gov.gr) → έκδοση συνεδρίας απευθείας.
+  // Η διπλή ταυτοποίηση γίνεται από την κρατική υπηρεσία, όχι από την εφαρμογή.
   router.post('/api/auth/taxisnet/start', (req, res) => {
     if (limited(req, res, 'login', 10, 5 * 60 * 1000)) return // 10 / 5 λεπτά
     const { username, password } = req.body ?? {}
     if (!username || !password) return badRequest(res, 'credentials_required')
-    const r = startLogin(username, password)
+    const r = login(username, password)
     if (!r.ok) return badRequest(res, r.reason)
-    ok(res, r)
-  })
-
-  // Βήμα 2 — επαλήθευση OTP → έκδοση συνεδρίας.
-  router.post('/api/auth/taxisnet/verify', (req, res) => {
-    if (limited(req, res, 'otp', 20, 5 * 60 * 1000)) return
-    const { challengeId, code } = req.body ?? {}
-    if (!challengeId || !code) return badRequest(res, 'challenge_and_code_required')
-    const r = verifyOtp(challengeId, code)
-    if (!r.ok) return badRequest(res, r.reason)
-    // Καταγραφή συγκατάθεσης κατά την εγγραφή/σύνδεση (αν συνοδεύεται).
+    // Καταγραφή συγκατάθεσης κατά τη σύνδεση (αν συνοδεύεται).
     if (req.body.consent) {
       recordConsent({ accountId: r.account.id, policy: 'terms', version: config.policyVersion })
       recordConsent({ accountId: r.account.id, policy: 'privacy', version: config.policyVersion })

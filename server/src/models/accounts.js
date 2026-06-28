@@ -30,6 +30,9 @@ export function getAccount(id) {
 export function eraseAccount(id) {
   const db = getDb()
   db.prepare('DELETE FROM sessions WHERE account_id = ?').run(id)
+  // Αποσύνδεση της ταυτότητας από τον εκλογικό κατάλογο: η συμμετοχή μένει
+  // μετρημένη (ακεραιότητα αποτελεσμάτων), αλλά χάνεται ο σύνδεσμος με το πρόσωπο.
+  db.prepare('UPDATE vote_participation SET account_id = NULL WHERE account_id = ?').run(id)
   // Διαγραφή ΑΦΜ-hash & ονόματος ώστε να μη μένει κανένα στοιχείο ταυτότητας.
   const info = db
     .prepare(
@@ -67,31 +70,6 @@ export function accountForToken(token) {
 export function destroySession(token) {
   if (!token) return
   getDb().prepare('DELETE FROM sessions WHERE token_hash = ?').run(hmac(token))
-}
-
-// ── OTP προκλήσεις ──────────────────────────────────────────────────────────
-export function createOtpChallenge({ afmHash, fullName, ageVerified, codeHash, ttlMs }) {
-  const id = 'otp-' + randomToken(8)
-  const now = Date.now()
-  getDb()
-    .prepare(
-      `INSERT INTO otp_challenges (id, afm_hash, full_name, age_verified, code_hash, created_at, expires_at)
-       VALUES (?,?,?,?,?,?,?)`,
-    )
-    .run(id, afmHash, fullName, ageVerified ? 1 : 0, codeHash, new Date(now).toISOString(), new Date(now + ttlMs).toISOString())
-  return id
-}
-
-export function getOtpChallenge(id) {
-  return getDb().prepare('SELECT * FROM otp_challenges WHERE id = ?').get(id)
-}
-
-export function bumpOtpAttempts(id) {
-  getDb().prepare('UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = ?').run(id)
-}
-
-export function deleteOtpChallenge(id) {
-  getDb().prepare('DELETE FROM otp_challenges WHERE id = ?').run(id)
 }
 
 // ── Συγκαταθέσεις (GDPR) ────────────────────────────────────────────────────

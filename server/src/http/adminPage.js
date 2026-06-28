@@ -102,6 +102,13 @@ export const ADMIN_PAGE = `<!doctype html>
     </div>
 
     <div class="card">
+      <h2>📊 Αναφορές / Στατιστικά</h2>
+      <p class="muted">Μόνο αριθμοί συμμετοχής — ποτέ δεν εμφανίζεται «τι ψήφισε» κάποιος.</p>
+      <div style="margin:8px 0"><button class="sec" onclick="loadReports()">Ανανέωση</button></div>
+      <div id="reports"><p class="muted">Φόρτωση…</p></div>
+    </div>
+
+    <div class="card">
       <h2>Υπάρχοντα ψηφίσματα</h2>
       <select id="listSociety" onchange="loadList()">
         <option value="greece">Ελλάδα — Βουλή</option>
@@ -122,7 +129,7 @@ export const ADMIN_PAGE = `<!doctype html>
   async function login(){
     TOKEN = $('token').value.trim();
     const r = await fetch('/api/admin/ping', { headers: headers() });
-    if (r.ok){ localStorage.setItem('democratia.adminToken', TOKEN); $('auth').style.display='none'; $('app').style.display='block'; loadList(); }
+    if (r.ok){ localStorage.setItem('democratia.adminToken', TOKEN); $('auth').style.display='none'; $('app').style.display='block'; loadList(); loadReports(); }
     else { show($('authMsg'), false, 'Λάθος κωδικός ή απενεργοποιημένη διαχείριση (δες ADMIN_TOKEN).'); }
   }
 
@@ -165,6 +172,37 @@ export const ADMIN_PAGE = `<!doctype html>
       btn.onclick = async ()=>{ if(!confirm('Διαγραφή;'))return; const rr=await fetch('/api/admin/votings/'+encodeURIComponent(v.id),{method:'DELETE',headers:headers()}); if(rr.ok) loadList(); };
       d.appendChild(btn); $('list').appendChild(d);
     });
+  }
+
+  function stat(label, value){ return '<div class="item"><span class="muted">'+label+'</span><b>'+value+'</b></div>'; }
+
+  async function loadReports(){
+    const r = await fetch('/api/admin/reports', { headers: headers() });
+    if (!r.ok){ $('reports').innerHTML = '<p class="muted">Δεν φορτώθηκαν οι αναφορές.</p>'; return; }
+    const d = await r.json();
+    const o = d.overview, a = d.activity;
+    let html = '<h2 style="font-size:13px;margin:6px 0">Σύνοψη</h2>';
+    html += stat('Εγγεγραμμένοι χρήστες', o.accounts);
+    html += stat('Ενεργές συνεδρίες (συνδεδεμένοι)', o.activeSessions);
+    html += stat('Διαγραμμένοι λογαριασμοί', o.accountsDeleted);
+    html += stat('Ψηφίσματα (ανοιχτά / σύνολο)', o.votingsOpen+' / '+o.votings);
+    html += stat('Σύνολο ψήφων', o.votesTotal);
+    html += stat('Σχόλια κοινότητας', o.comments);
+    html += '<h2 style="font-size:13px;margin:14px 0 6px">Δραστηριότητα</h2>';
+    html += stat('Ψήφοι τελευταίο 24ωρο', a.votesLast24h);
+    html += stat('Ψήφοι τελευταία 7 ημέρες', a.votesLast7d);
+    html += stat('Ψήφοι τελευταίες 30 ημέρες', a.votesLast30d);
+    html += stat('Ενεργοί ψηφοφόροι (7 ημ.)', a.activeVoters7d);
+    html += stat('Ενεργοί ψηφοφόροι (30 ημ.)', a.activeVoters30d);
+    html += stat('Νέοι λογαριασμοί (7 ημ.)', a.newAccounts7d);
+    html += stat('Νέοι λογαριασμοί (30 ημ.)', a.newAccounts30d);
+    if (d.perVoting && d.perVoting.length){
+      html += '<h2 style="font-size:13px;margin:14px 0 6px">Συμμετοχή ανά ψήφισμα</h2>';
+      d.perVoting.forEach(v=>{
+        html += '<div class="item"><span><b>'+v.title+'</b><br><span class="muted">'+v.status+' · ΥΠΕΡ '+v.tally.yes+' / ΚΑΤΑ '+v.tally.no+' / ΑΠΟΧΗ '+v.tally.present+'</span></span><b>'+v.turnout+' ψήφοι</b></div>';
+      });
+    }
+    $('reports').innerHTML = html;
   }
 
   if (TOKEN){ $('token').value = TOKEN; login(); }

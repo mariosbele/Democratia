@@ -12,9 +12,30 @@ const { getDb } = await import('../src/db/index.js')
 const { ensureSeeded } = await import('../src/seed/seed.js')
 const { castPlatformVote, platformTally, hasVoted, upsertOfficialResult, getOfficialResult } =
   await import('../src/models/results.js')
+const { upsertAccount } = await import('../src/models/accounts.js')
 
 getDb()
 await ensureSeeded()
+
+test('διαχωρισμός κάλπης/καταλόγου: η ψήφος δεν συνδέεται με ταυτότητα', () => {
+  const db = getDb()
+  // Η «κάλπη» (platform_votes) ΔΕΝ έχει στήλη ταυτότητας ψηφοφόρου.
+  const cols = db.prepare('PRAGMA table_info(platform_votes)').all().map((c) => c.name)
+  assert.ok(!cols.includes('voter_hash'), 'η κάλπη δεν περιέχει voter_hash')
+  assert.ok(!cols.includes('account_id'), 'η κάλπη δεν περιέχει account_id')
+
+  // Συνδεδεμένος ψηφοφόρος: καταγράφεται στον εκλογικό κατάλογο (account_id),
+  // ενώ η επιλογή του πάει ανώνυμα στην κάλπη.
+  const acc = upsertAccount({ afmHash: 'hash-test-1', fullName: 'Δοκιμή', ageVerified: true })
+  const r = castPlatformVote('v-energy', 'yes', { accountId: acc.id })
+  assert.ok(r.ok)
+  const part = db
+    .prepare('SELECT account_id FROM vote_participation WHERE voting_id = ? AND account_id = ?')
+    .get('v-energy', acc.id)
+  assert.ok(part, 'η συμμετοχή καταγράφηκε με account_id')
+  // Δεύτερη ψήφος ίδιου λογαριασμού απορρίπτεται.
+  assert.equal(castPlatformVote('v-energy', 'no', { accountId: acc.id }).reason, 'already_voted')
+})
 
 test('η ανώνυμη ψήφος καταγράφεται και μετριέται', () => {
   const r1 = castPlatformVote('v-budget-2024', 'yes', 'voter-A')
